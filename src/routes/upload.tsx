@@ -1,8 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { useCallback, useState } from "react";
 import { UploadCloud, FileText, Loader2, CheckCircle2, X } from "lucide-react";
 import { toast } from "sonner";
+import { uploadCsvPair, API_BASE } from "@/lib/api";
 
 export const Route = createFileRoute("/upload")({
   head: () => ({
@@ -28,126 +29,248 @@ function parseCsv(text: string): { headers: string[]; rows: Row[] } {
 }
 
 function UploadPage() {
-  const [drag, setDrag] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<{ headers: string[]; rows: Row[] }>({ headers: [], rows: [] });
+  const [dragTarget, setDragTarget] = useState<"a" | "b" | null>(null);
+  const [fileA, setFileA] = useState<File | null>(null);
+  const [fileB, setFileB] = useState<File | null>(null);
+  const [previewA, setPreviewA] = useState<{ headers: string[]; rows: Row[] }>({ headers: [], rows: [] });
+  const [previewB, setPreviewB] = useState<{ headers: string[]; rows: Row[] }>({ headers: [], rows: [] });
   const [uploading, setUploading] = useState(false);
   const [done, setDone] = useState(false);
+  const [lastSummary, setLastSummary] = useState<string | null>(null);
 
-  const handleFile = useCallback(async (f: File) => {
+  const handleFile = useCallback(async (f: File, side: "a" | "b") => {
     if (!f.name.toLowerCase().endsWith(".csv")) {
       toast.error("Please upload a .csv file");
       return;
     }
-    setFile(f);
-    setDone(false);
     const text = await f.text();
-    setPreview(parseCsv(text));
-    toast.success(`${f.name} loaded — ${(f.size / 1024).toFixed(1)} KB`);
+    const prev = parseCsv(text);
+    if (side === "a") {
+      setFileA(f);
+      setPreviewA(prev);
+    } else {
+      setFileB(f);
+      setPreviewB(prev);
+    }
+    setDone(false);
+    setLastSummary(null);
+    toast.success(`${f.name} loaded (${side === "a" ? "Dept A" : "Dept B"}) — ${(f.size / 1024).toFixed(1)} KB`);
   }, []);
 
-  const onDrop = (e: React.DragEvent) => {
+  const onDrop = (e: React.DragEvent, side: "a" | "b") => {
     e.preventDefault();
-    setDrag(false);
+    setDragTarget(null);
     const f = e.dataTransfer.files?.[0];
-    if (f) handleFile(f);
+    if (f) void handleFile(f, side);
   };
 
   const upload = async () => {
-    if (!file) return;
+    if (!fileA || !fileB) {
+      toast.error("Select both CSV files (Department A and Department B).");
+      return;
+    }
     setUploading(true);
-    await new Promise((r) => setTimeout(r, 1600));
-    setUploading(false);
-    setDone(true);
-    toast.success("Dataset queued for AI ingestion");
+    setDone(false);
+    setLastSummary(null);
+    try {
+      const res = await uploadCsvPair(fileA, fileB);
+      setDone(true);
+      setLastSummary(
+        `${res.candidate_pairs} candidate pairs · AUTO_LINK: ${res.tier_counts.AUTO_LINK ?? 0}, ` +
+          `HUMAN_REVIEW: ${res.tier_counts.HUMAN_REVIEW ?? 0}, NO_MATCH: ${res.tier_counts.NO_MATCH ?? 0}`,
+      );
+      toast.success(`Pipeline complete — ${res.total_records} records ingested`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
   };
 
-  const clear = () => {
-    setFile(null);
-    setPreview({ headers: [], rows: [] });
+  const clear = (side?: "a" | "b") => {
+    if (!side || side === "a") {
+      setFileA(null);
+      setPreviewA({ headers: [], rows: [] });
+    }
+    if (!side || side === "b") {
+      setFileB(null);
+      setPreviewB({ headers: [], rows: [] });
+    }
     setDone(false);
+    setLastSummary(null);
   };
+
+  const dropClass = (side: "a" | "b") =>
+    `glass-card relative grid place-items-center p-8 text-center transition-all ${
+      dragTarget === side ? "border-primary shadow-glow-orange" : ""
+    }`;
 
   return (
     <PageShell
       title="Upload Department Data"
-      subtitle="Drop in a CSV from MCA, GST, PAN or any agency. UBID will normalize, deduplicate, and link records to a unified ID."
+      subtitle={`Pair two registers (e.g. shops vs factories). Files are sent to the API at ${API_BASE} — POST /upload.`}
     >
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
-        onDragLeave={() => setDrag(false)}
-        onDrop={onDrop}
-        className={`glass-card relative grid place-items-center p-12 text-center transition-all ${
-          drag ? "border-primary shadow-glow-orange" : ""
-        }`}
-      >
-        <div className={`mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-gradient-neon shadow-glow-blue ${drag ? "scale-110" : ""} transition-transform`}>
-          <UploadCloud className="h-8 w-8 text-background" />
+      <p className="mb-4 text-xs text-muted-foreground">
+        Backend expects multipart fields <code className="rounded bg-white/10 px-1">dept_a</code> and{" "}
+        <code className="rounded bg-white/10 px-1">dept_b</code>. After upload, open Matching or Review.
+      </p>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragTarget("a");
+          }}
+          onDragLeave={() => setDragTarget(null)}
+          onDrop={(e) => onDrop(e, "a")}
+          className={dropClass("a")}
+        >
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">Department A</p>
+          <div className="mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-neon shadow-glow-blue">
+            <UploadCloud className="h-6 w-6 text-background" />
+          </div>
+          <h3 className="text-sm font-semibold">CSV for dept A</h3>
+          <p className="mt-1 text-xs text-muted-foreground">e.g. shop_establishment.csv</p>
+          <label className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:opacity-90 transition">
+            Choose file
+            <input
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={(e) => e.target.files?.[0] && void handleFile(e.target.files[0], "a")}
+            />
+          </label>
         </div>
-        <h3 className="text-lg font-semibold">Drag & drop your CSV here</h3>
-        <p className="mt-1 text-sm text-muted-foreground">or click to browse — up to 50MB</p>
-        <label className="mt-5 inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition">
-          Choose file
-          <input
-            type="file"
-            accept=".csv"
-            className="hidden"
-            onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-          />
-        </label>
+
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragTarget("b");
+          }}
+          onDragLeave={() => setDragTarget(null)}
+          onDrop={(e) => onDrop(e, "b")}
+          className={dropClass("b")}
+        >
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-accent">Department B</p>
+          <div className="mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-neon shadow-glow-orange">
+            <UploadCloud className="h-6 w-6 text-background" />
+          </div>
+          <h3 className="text-sm font-semibold">CSV for dept B</h3>
+          <p className="mt-1 text-xs text-muted-foreground">e.g. factories.csv</p>
+          <label className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:opacity-90 transition">
+            Choose file
+            <input
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={(e) => e.target.files?.[0] && void handleFile(e.target.files[0], "b")}
+            />
+          </label>
+        </div>
       </div>
 
-      {file && (
-        <section className="glass-card mt-6 p-5 animate-slide-up">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-md bg-accent/15 text-accent">
-                <FileText className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold">{file.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {(file.size / 1024).toFixed(1)} KB · {preview.rows.length} rows previewed
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={clear} className="rounded-md p-2 text-muted-foreground hover:bg-white/5" aria-label="Clear">
-                <X className="h-4 w-4" />
-              </button>
-              <button
-                onClick={upload}
-                disabled={uploading || done}
-                className="inline-flex items-center gap-2 rounded-md bg-gradient-neon px-5 py-2 text-sm font-semibold text-background shadow-glow-orange disabled:opacity-60"
-              >
-                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : done ? <CheckCircle2 className="h-4 w-4" /> : <UploadCloud className="h-4 w-4" />}
-                {uploading ? "Uploading..." : done ? "Uploaded" : "Upload to UBID"}
-              </button>
-            </div>
+      {(fileA || fileB) && (
+        <section className="glass-card mt-6 flex flex-wrap items-center justify-between gap-3 p-4 animate-slide-up">
+          <div className="text-sm text-muted-foreground">
+            {fileA && fileB ? (
+              <span>
+                Ready: <span className="font-medium text-foreground">{fileA.name}</span> +{" "}
+                <span className="font-medium text-foreground">{fileB.name}</span>
+              </span>
+            ) : (
+              <span>Select both files to enable upload.</span>
+            )}
           </div>
-
-          <div className="overflow-x-auto rounded-md border border-border">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-white/[0.03] text-xs uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  {preview.headers.map((h) => (
-                    <th key={h} className="px-4 py-2.5 whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {preview.rows.map((r, i) => (
-                  <tr key={i} className="hover:bg-white/[0.02]">
-                    {preview.headers.map((h) => (
-                      <td key={h} className="px-4 py-2.5 whitespace-nowrap text-foreground/90">{r[h]}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => clear()} className="rounded-md border border-border px-3 py-2 text-xs hover:bg-white/5">
+              Clear all
+            </button>
+            <button
+              type="button"
+              onClick={() => void upload()}
+              disabled={uploading || !fileA || !fileB}
+              className="inline-flex items-center gap-2 rounded-md bg-gradient-neon px-5 py-2 text-sm font-semibold text-background shadow-glow-orange disabled:opacity-50"
+            >
+              {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : done ? <CheckCircle2 className="h-4 w-4" /> : <UploadCloud className="h-4 w-4" />}
+              {uploading ? "Uploading…" : done ? "Done" : "Run pipeline"}
+            </button>
+            {done && (
+              <Link to="/matching" className="text-xs font-medium text-primary hover:underline">
+                View matches →
+              </Link>
+            )}
           </div>
         </section>
       )}
+
+      {lastSummary && (
+        <p className="mt-3 text-center text-xs text-muted-foreground animate-fade-in">{lastSummary}</p>
+      )}
+
+      {fileA && (
+        <PreviewTable title="Department A preview" file={fileA} preview={previewA} onClear={() => clear("a")} />
+      )}
+      {fileB && (
+        <PreviewTable title="Department B preview" file={fileB} preview={previewB} onClear={() => clear("b")} />
+      )}
     </PageShell>
+  );
+}
+
+function PreviewTable({
+  title,
+  file,
+  preview,
+  onClear,
+}: {
+  title: string;
+  file: File;
+  preview: { headers: string[]; rows: Row[] };
+  onClear: () => void;
+}) {
+  return (
+    <section className="glass-card mt-6 p-5 animate-slide-up">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="grid h-10 w-10 place-items-center rounded-md bg-accent/15 text-accent">
+            <FileText className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold">{title}</p>
+            <p className="text-xs text-muted-foreground">
+              {file.name} · {(file.size / 1024).toFixed(1)} KB · {preview.rows.length} rows previewed
+            </p>
+          </div>
+        </div>
+        <button type="button" onClick={onClear} className="rounded-md p-2 text-muted-foreground hover:bg-white/5" aria-label="Clear">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="overflow-x-auto rounded-md border border-border">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-white/[0.03] text-xs uppercase tracking-wider text-muted-foreground">
+            <tr>
+              {preview.headers.map((h) => (
+                <th key={h} className="px-4 py-2.5 whitespace-nowrap">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {preview.rows.map((r, i) => (
+              <tr key={i} className="hover:bg-white/[0.02]">
+                {preview.headers.map((h) => (
+                  <td key={h} className="px-4 py-2.5 whitespace-nowrap text-foreground/90">
+                    {r[h]}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }

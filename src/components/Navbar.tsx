@@ -1,6 +1,8 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { LayoutDashboard, Upload, Sparkles, ListChecks, Fingerprint } from "lucide-react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { API_BASE, getHealth } from "@/lib/api";
 
 const items = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -11,6 +13,26 @@ const items = [
 
 export function Navbar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [apiOk, setApiOk] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const ping = () => {
+      getHealth()
+        .then(() => {
+          if (!cancelled) setApiOk(true);
+        })
+        .catch(() => {
+          if (!cancelled) setApiOk(false);
+        });
+    };
+    ping();
+    const t = globalThis.setInterval(ping, 30_000);
+    return () => {
+      cancelled = true;
+      globalThis.clearInterval(t);
+    };
+  }, []);
 
   return (
     <header className="sticky top-0 z-40 px-4 pt-4">
@@ -47,9 +69,16 @@ export function Navbar() {
           })}
         </nav>
 
-        <div className="hidden lg:flex items-center gap-2 rounded-md border border-border/60 px-3 py-1.5 text-xs text-muted-foreground">
-          <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
-          AI Engine: Online
+        <div
+          className="hidden lg:flex max-w-[220px] flex-col items-end gap-0.5 rounded-md border border-border/60 px-3 py-1.5 text-xs text-muted-foreground"
+          title={`${API_BASE}/health`}
+        >
+          <span className="inline-flex items-center gap-2">
+            <span
+              className={`h-2 w-2 rounded-full ${apiOk === true ? "bg-success" : apiOk === false ? "bg-destructive" : "bg-warning animate-pulse"}`}
+            />
+            {apiOk === true ? "API: connected" : apiOk === false ? "API: offline" : "API: …"}
+          </span>
         </div>
       </div>
 
