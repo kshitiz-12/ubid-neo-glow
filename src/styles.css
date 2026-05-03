@@ -142,3 +142,175 @@
 @utility text-glow-blue {
   text-shadow: 0 0 18px oklch(0.7 0.2 240 / 0.6);
 }
+
+/* -------------------------------------------------------------------------- */
+/* Dashboard empty state — CSS 3D (no WebGL)                                  */
+/* -------------------------------------------------------------------------- */
+@keyframes ubid-wait-cube-spin {
+  from {
+    transform: rotateX(-20deg) rotateY(0deg);
+  }
+  to {
+    transform: rotateX(-20deg) rotateY(360deg);
+  }
+}
+@keyframes ubid-wait-orbit-spin {
+  from {
+    transform: rotateX(72deg) rotateZ(0deg);
+  }
+  to {
+    transform: rotateX(72deg) rotateZ(360deg);
+  }
+}
+@keyframes ubid-wait-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+@keyframes ubid-wait-core-pulse {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: translate(-50%, -50%) scale(1);
+    box-shadow: 0 0 20px oklch(0.72 0.2 50 / 0.5), 0 0 40px oklch(0.7 0.2 240 / 0.35);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.08);
+    box-shadow: 0 0 28px oklch(0.72 0.2 50 / 0.65), 0 0 56px oklch(0.7 0.2 240 / 0.45);
+  }
+}
+
+.ubid-wait-stage {
+  position: relative;
+  perspective: 720px;
+  perspective-origin: 50% 45%;
+  animation: ubid-wait-float 4s ease-in-out infinite;
+}
+
+.ubid-wait-pivot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1px;
+  height: 1px;
+  transform-style: preserve-3d;
+  transform: translate(-50%, -50%);
+}
+
+.ubid-wait-cube {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 88px;
+  height: 88px;
+  margin-left: -44px;
+  margin-top: -44px;
+  transform-style: preserve-3d;
+  animation: ubid-wait-cube-spin 14s linear infinite;
+}
+
+.ubid-wait-face {
+  position: absolute;
+  inset: 0;
+  border: 2px solid oklch(0.72 0.2 50 / 0.55);
+  border-radius: 4px;
+  background: linear-gradient(135deg, oklch(0.72 0.2 50 / 0.08), oklch(0.7 0.2 240 / 0.12));
+  box-shadow: inset 0 0 24px oklch(0.7 0.2 240 / 0.15);
+  backface-visibility: visible;
+}
+.ubid-wait-face--front {
+  transform: translateZ(44px);
+}
+.ubid-wait-face--back {
+  transform: rotateY(180deg) translateZ(44px);
+}
+.ubid-wait-face--right {
+  transform: rotateY(90deg) translateZ(44px);
+}
+.ubid-wait-face--left {
+  transform: rotateY(-90deg) translateZ(44px);
+}
+.ubid-wait-face--top {
+  transform: rotateX(90deg) translateZ(44px);
+}
+.ubid-wait-face--bottom {
+  transform: rotateX(-90deg) translateZ(44px);
+}
+
+.ubid-wait-orbit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 168px;
+  height: 168px;
+  margin-left: -84px;
+  margin-top: -84px;
+  border: 1px dashed oklch(0.7 0.2 240 / 0.35);
+  border-radius: 9999px;
+  transform-style: preserve-3d;
+  animation: ubid-wait-orbit-spin 22s linear infinite;
+  box-shadow: 0 0 24px oklch(0.72 0.2 50 / 0.12);
+}
+
+.ubid-wait-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, var(--neon-orange), var(--neon-blue));
+  transform: translate(-50%, -50%);
+  animation: ubid-wait-core-pulse 2.2s ease-in-out infinite;
+  z-index: 2;
+}
+
+.ubid-wait-stage--compact .ubid-wait-cube {
+  width: 56px;
+  height: 56px;
+  margin-left: -28px;
+  margin-top: -28px;
+}
+.ubid-wait-stage--compact .ubid-wait-face--front {
+  transform: translateZ(28px);
+}
+.ubid-wait-stage--compact .ubid-wait-face--back {
+  transform: rotateY(180deg) translateZ(28px);
+}
+.ubid-wait-stage--compact .ubid-wait-face--right {
+  transform: rotateY(90deg) translateZ(28px);
+}
+.ubid-wait-stage--compact .ubid-wait-face--left {
+  transform: rotateY(-90deg) translateZ(28px);
+}
+.ubid-wait-stage--compact .ubid-wait-face--top {
+  transform: rotateX(90deg) translateZ(28px);
+}
+.ubid-wait-stage--compact .ubid-wait-face--bottom {
+  transform: rotateX(-90deg) translateZ(28px);
+}
+.ubid-wait-stage--compact .ubid-wait-orbit {
+  width: 112px;
+  height: 112px;
+  margin-left: -56px;
+  margin-top: -56px;
+}
+.ubid-wait-stage--compact .ubid-wait-core {
+  width: 14px;
+  height: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ubid-wait-stage,
+  .ubid-wait-cube,
+  .ubid-wait-orbit,
+  .ubid-wait-core {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

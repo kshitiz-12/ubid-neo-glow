@@ -18,6 +18,7 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { API_BASE, getMatches, getStats, type MatchQueueItem, type StatsResponse } from "@/lib/api";
+import { DashboardWaiting3D } from "@/components/DashboardWaiting3D";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -129,6 +130,11 @@ function Dashboard() {
 
   const hasChartData = charts && charts.totalPairs > 0;
 
+  const showDataHero =
+    !loading &&
+    (stats === null || (stats.total_records === 0 && (!charts || charts.totalPairs === 0)));
+  const heroReason = stats === null ? "api" : "empty";
+
   return (
     <PageShell
       title="Identity Resolution Overview"
@@ -168,7 +174,7 @@ function Dashboard() {
           return (
             <div
               key={s.label}
-              className="glass-card group relative overflow-hidden p-5 transition-all hover:-translate-y-0.5 animate-slide-up"
+              className="glass-card group relative overflow-hidden p-5 transition-transform duration-500 ease-out animate-slide-up [transform-style:preserve-3d] hover:[transform:perspective(960px)_rotateX(7deg)_rotateY(-6deg)_translateY(-4px)]"
               style={{ animationDelay: `${i * 60}ms` }}
             >
               <div className={`absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-30 blur-2xl ${s.glow}`} />
@@ -194,104 +200,122 @@ function Dashboard() {
         })}
       </section>
 
-      <section className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="glass-card p-5 lg:col-span-2">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Candidate pairs by tier</h2>
-            <span className="text-xs text-muted-foreground">{charts ? `${charts.totalPairs} pairs` : "—"}</span>
-          </div>
-          {!charts && !loading && <p className="text-sm text-muted-foreground">Could not load match queue.</p>}
-          {loading && charts === null && (
-            <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading charts…
-            </div>
-          )}
-          {charts && !hasChartData && !loading && (
-            <div className="flex h-72 flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
-              <p>No pairs in the queue yet.</p>
-              <Link to="/upload" className="text-primary hover:underline">
-                Upload two CSVs
-              </Link>
-            </div>
-          )}
-          {charts && hasChartData && (
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={charts.tierBars} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(1 0 0 / 0.06)" />
-                  <XAxis dataKey="name" stroke="oklch(0.7 0.02 260)" fontSize={12} tickLine={false} />
-                  <YAxis allowDecimals={false} stroke="oklch(0.7 0.02 260)" fontSize={12} tickLine={false} />
-                  <Tooltip
-                    contentStyle={{
-                      background: "oklch(0.18 0.04 260)",
-                      border: "1px solid oklch(1 0 0 / 0.1)",
-                      borderRadius: 8,
-                    }}
-                    formatter={(value: number) => [value, "Pairs"]}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="count" name="Pairs" radius={[6, 6, 0, 0]}>
-                    {charts.tierBars.map((entry, i) => (
-                      <Cell key={`cell-${i}`} fill={entry.fill} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
+      {showDataHero && (
+        <section className="mb-8 animate-fade-in">
+          <DashboardWaiting3D variant="hero" reason={heroReason} />
+        </section>
+      )}
 
-        <div className="glass-card p-5">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Pairs by status</h2>
-          {!charts && !loading && <p className="text-sm text-muted-foreground">No data.</p>}
-          {loading && charts === null && (
-            <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+      {showDataHero ? (
+        <section className="glass-card mb-8 p-6 text-center text-sm text-muted-foreground">
+          <p>
+            Tier and status charts will appear in this row after your first successful{" "}
+            <Link to="/upload" className="text-primary hover:underline">
+              CSV upload
+            </Link>
+            .
+          </p>
+        </section>
+      ) : (
+        <section className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="glass-card p-5 lg:col-span-2">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Candidate pairs by tier</h2>
+              <span className="text-xs text-muted-foreground">{charts ? `${charts.totalPairs} pairs` : "—"}</span>
             </div>
-          )}
-          {charts && !hasChartData && !loading && (
-            <div className="flex h-72 items-center justify-center text-center text-xs text-muted-foreground">Upload to see status mix</div>
-          )}
-          {charts && hasChartData && (
-            <>
+            {!charts && !loading && <p className="text-sm text-muted-foreground">Could not load match queue.</p>}
+            {loading && charts === null && (
+              <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading charts…
+              </div>
+            )}
+            {charts && !hasChartData && !loading && (
+              <DashboardWaiting3D variant="compact" reason="empty" />
+            )}
+            {charts && hasChartData && (
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={charts.statusPie}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius={55}
-                      outerRadius={90}
-                      paddingAngle={4}
-                    >
-                      {charts.statusPie.map((d) => (
-                        <Cell key={d.name} fill={d.color} stroke="transparent" />
-                      ))}
-                    </Pie>
+                  <BarChart data={charts.tierBars} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(1 0 0 / 0.06)" />
+                    <XAxis dataKey="name" stroke="oklch(0.7 0.02 260)" fontSize={12} tickLine={false} />
+                    <YAxis allowDecimals={false} stroke="oklch(0.7 0.02 260)" fontSize={12} tickLine={false} />
                     <Tooltip
                       contentStyle={{
                         background: "oklch(0.18 0.04 260)",
                         border: "1px solid oklch(1 0 0 / 0.1)",
                         borderRadius: 8,
                       }}
+                      formatter={(value: number) => [value, "Pairs"]}
                     />
-                  </PieChart>
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Bar dataKey="count" name="Pairs" radius={[6, 6, 0, 0]}>
+                      {charts.tierBars.map((entry, i) => (
+                        <Cell key={`cell-${i}`} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div className="mt-2 flex flex-wrap justify-center gap-3 text-center text-xs">
-                {charts.statusPie.map((d) => (
-                  <div key={d.name}>
-                    <div className="mx-auto h-1.5 w-8 rounded-full" style={{ background: d.color }} />
-                    <p className="mt-1.5 text-muted-foreground">{d.name}</p>
-                    <p className="font-semibold">{d.value}</p>
-                  </div>
-                ))}
+            )}
+          </div>
+
+          <div className="glass-card p-5">
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Pairs by status</h2>
+            {!charts && !loading && <p className="text-sm text-muted-foreground">No data.</p>}
+            {loading && charts === null && (
+              <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               </div>
-            </>
-          )}
-        </div>
-      </section>
+            )}
+            {charts && !hasChartData && !loading && (
+              <div className="flex h-72 flex-col items-center justify-center gap-3 px-4 text-center text-xs text-muted-foreground">
+                <p>Status distribution will render here once pairs exist in the queue.</p>
+                <Link to="/upload" className="text-primary hover:underline">
+                  Upload data
+                </Link>
+              </div>
+            )}
+            {charts && hasChartData && (
+              <>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={charts.statusPie}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius={55}
+                        outerRadius={90}
+                        paddingAngle={4}
+                      >
+                        {charts.statusPie.map((d) => (
+                          <Cell key={d.name} fill={d.color} stroke="transparent" />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          background: "oklch(0.18 0.04 260)",
+                          border: "1px solid oklch(1 0 0 / 0.1)",
+                          borderRadius: 8,
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-2 flex flex-wrap justify-center gap-3 text-center text-xs">
+                  {charts.statusPie.map((d) => (
+                    <div key={d.name}>
+                      <div className="mx-auto h-1.5 w-8 rounded-full" style={{ background: d.color }} />
+                      <p className="mt-1.5 text-muted-foreground">{d.name}</p>
+                      <p className="font-semibold">{d.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </section>
+      )}
 
       <section className="glass-card p-5">
         <div className="mb-4 flex items-center justify-between">
