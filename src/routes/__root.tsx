@@ -1,8 +1,6 @@
-import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { Outlet, Link, createRootRoute } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { Navbar } from "@/components/Navbar";
-
-import appCss from "../styles.css?url";
 
 function NotFoundComponent() {
   return (
@@ -20,39 +18,9 @@ function NotFoundComponent() {
 }
 
 export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "UBID — Unified Business Identity Resolution" },
-      { name: "description", content: "AI-powered identity resolution dashboard for unifying duplicate business records across government departments." },
-      { property: "og:title", content: "UBID — Unified Business Identity Resolution" },
-      { name: "twitter:title", content: "UBID — Unified Business Identity Resolution" },
-      { property: "og:description", content: "AI-powered identity resolution dashboard for unifying duplicate business records across government departments." },
-      { name: "twitter:description", content: "AI-powered identity resolution dashboard for unifying duplicate business records across government departments." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/74ca1913-591b-44da-a2fe-dce3c8142c5f/id-preview-5964ec50--e5e508de-d8b2-4863-8996-c7c31517c920.lovable.app-1777789375074.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/74ca1913-591b-44da-a2fe-dce3c8142c5f/id-preview-5964ec50--e5e508de-d8b2-4863-8996-c7c31517c920.lovable.app-1777789375074.png" },
-      { name: "twitter:card", content: "summary_large_image" },
-      { property: "og:type", content: "website" },
-    ],
-    links: [{ rel: "stylesheet", href: appCss }],
-  }),
-  shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
 });
-
-function RootShell({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en" className="dark">
-      <head><HeadContent /></head>
-      <body>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  );
-}
 
 function RootComponent() {
   return (
